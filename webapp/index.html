@@ -1,0 +1,367 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Price Hawk</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0f1a; --card: #121828; --card2: #171f33; --line: #232c44;
+    --text: #f2f4f8; --muted: #8590a8; --accent: #f5a524; --accent-ink: #1a1203;
+    --good: #2ecc8f; --bad: #ff5d6c; --white-card: #f6f7fb; --white-ink: #0b0f1a;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: "Cairo", system-ui, sans-serif; }
+  body { min-height: 100vh; padding-bottom: 110px; }
+  button { font-family: inherit; cursor: pointer; }
+  .wrap { max-width: 560px; margin: 0 auto; padding: 18px 16px 0; }
+
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  header h1 { margin: 0; font-size: 28px; font-weight: 800; }
+  .icon-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--line); background: var(--card);
+    color: var(--text); display: grid; place-items: center; }
+  .icon-btn svg { width: 18px; height: 18px; }
+
+  .stats { display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 4px 16px 6px; }
+  .stats::-webkit-scrollbar { display: none; }
+  .stat { flex: 0 0 auto; min-width: 150px; background: var(--white-card); color: var(--white-ink); border-radius: 18px; padding: 14px 16px; }
+  .stat small { display: block; font-size: 12px; color: #5b6478; font-weight: 600; }
+  .stat b { font-size: 20px; font-weight: 800; direction: ltr; display: inline-block; }
+  .stat .cur { font-size: 12px; font-weight: 600; margin-inline-start: 3px; }
+  .stat.good b { color: #0f9b67; }
+
+  .section-head { display: flex; justify-content: space-between; align-items: center; color: var(--muted);
+    font-size: 13px; font-weight: 600; margin: 22px 2px 10px; }
+
+  .item { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--line);
+    border-radius: 16px; padding: 10px 12px; margin-bottom: 10px; width: 100%; text-align: right; color: inherit; }
+  .thumb { width: 52px; height: 52px; border-radius: 12px; background: #fff; flex: 0 0 auto; display: grid; place-items: center; overflow: hidden; }
+  .thumb img { max-width: 90%; max-height: 90%; object-fit: contain; }
+  .item .info { flex: 1; min-width: 0; }
+  .item .title { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .row { display: flex; gap: 8px; align-items: center; margin-top: 3px; font-size: 13px; }
+  .price { font-weight: 800; }
+  .pill { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 99px; }
+  .pill.down { background: rgba(46,204,143,.14); color: var(--good); }
+  .pill.up { background: rgba(255,93,108,.14); color: var(--bad); }
+  .pill.target { background: rgba(245,165,36,.14); color: var(--accent); }
+
+  .empty { text-align: center; color: var(--muted); padding: 50px 20px; }
+  .empty .big { font-size: 46px; }
+
+  .fab { position: fixed; bottom: 100px; left: max(18px, calc(50% - 262px)); width: 58px; height: 58px; border-radius: 50%;
+    background: var(--accent); color: var(--accent-ink); border: 0; font-size: 32px; line-height: 1;
+    box-shadow: 0 8px 24px rgba(245,165,36,.35); display: grid; place-items: center; z-index: 5; }
+
+  nav { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); width: min(460px, calc(100% - 32px));
+    background: rgba(18,24,40,.92); backdrop-filter: blur(12px); border: 1px solid var(--line); border-radius: 22px;
+    display: flex; justify-content: space-around; padding: 8px; z-index: 6; }
+  nav button { background: none; border: 0; color: var(--muted); font-size: 12px; font-weight: 600; display: flex;
+    flex-direction: column; align-items: center; gap: 3px; padding: 4px 14px; position: relative; }
+  nav button .ic { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; }
+  nav button svg { width: 20px; height: 20px; }
+  nav button.active { color: var(--accent); }
+  nav button.active .ic { background: rgba(245,165,36,.15); border: 1px solid rgba(245,165,36,.5); }
+  nav .dot { position: absolute; top: 4px; right: 18px; width: 7px; height: 7px; border-radius: 50%; background: var(--bad); }
+
+  /* bottom sheet */
+  .backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); opacity: 0; pointer-events: none; transition: .2s; z-index: 10; }
+  .backdrop.open { opacity: 1; pointer-events: auto; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; max-width: 560px; margin: 0 auto; background: var(--card);
+    border-radius: 24px 24px 0 0; border: 1px solid var(--line); border-bottom: 0; padding: 10px 16px 24px;
+    transform: translateY(105%); transition: transform .25s ease; z-index: 11; max-height: 90vh; overflow-y: auto; }
+  .sheet.open { transform: none; }
+  .grab { width: 42px; height: 5px; border-radius: 9px; background: var(--line); margin: 0 auto 14px; }
+
+  .d-head { display: flex; gap: 14px; align-items: flex-start; }
+  .d-head .thumb { width: 80px; height: 80px; border-radius: 16px; }
+  .d-head h2 { margin: 0 0 8px; font-size: 16px; line-height: 1.5; font-weight: 700; }
+  .link-pill { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--accent);
+    border: 1px solid rgba(245,165,36,.5); background: rgba(245,165,36,.08); padding: 3px 10px; border-radius: 99px; text-decoration: none; }
+
+  .lbl { display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; font-weight: 600; margin: 18px 2px 8px; }
+  .box { background: var(--bg); border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+  .now-price { text-align: center; }
+  .now-price .seller { font-size: 11px; color: var(--accent); font-weight: 700; letter-spacing: .5px; }
+  .now-price .p { font-size: 24px; font-weight: 800; }
+  .minis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; }
+  .mini { background: var(--card2); border-radius: 12px; padding: 8px; text-align: center; }
+  .mini small { display: block; color: var(--muted); font-size: 11px; }
+  .mini b { font-size: 13px; }
+  svg.chart { width: 100%; height: 120px; display: block; }
+
+  .toggle-row { display: flex; justify-content: space-between; align-items: center; }
+  .toggle-row span { font-weight: 700; }
+  .switch { width: 46px; height: 26px; border-radius: 99px; background: var(--line); border: 0; position: relative; transition: .2s; }
+  .switch::after { content: ""; position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: .2s; }
+  .switch.on { background: var(--accent); }
+  .switch.on::after { right: 23px; }
+  .target-input { display: flex; gap: 8px; margin-top: 12px; }
+  input { flex: 1; min-width: 0; background: var(--card2); border: 1px solid var(--line); color: var(--text); border-radius: 12px;
+    padding: 12px; font-family: inherit; font-size: 15px; outline: none; }
+  input:focus { border-color: var(--accent); }
+  .btn { background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 12px; padding: 12px 18px; font-weight: 800; font-size: 14px; }
+  .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  .btn.danger { background: rgba(255,93,108,.12); color: var(--bad); border: 1px solid rgba(255,93,108,.35); }
+  .btn:disabled { opacity: .5; }
+  .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 18px; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .err { color: var(--bad); font-size: 13px; margin-top: 8px; min-height: 18px; }
+
+  .acc-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; margin-bottom: 10px; }
+  .acc-card .k { color: var(--muted); font-size: 12px; }
+  .acc-card .v { font-weight: 700; margin-top: 2px; }
+  .avatar { width: 64px; height: 64px; border-radius: 50%; background: var(--accent); color: var(--accent-ink);
+    display: grid; place-items: center; font-size: 26px; font-weight: 800; margin-bottom: 10px; }
+
+  .toast { position: fixed; top: 16px; left: 50%; transform: translate(-50%, -80px); background: var(--white-card); color: var(--white-ink);
+    padding: 10px 18px; border-radius: 12px; font-weight: 700; font-size: 14px; transition: .25s; z-index: 20; }
+  .toast.show { transform: translate(-50%, 0); }
+  .spin { width: 18px; height: 18px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%;
+    display: inline-block; animation: s .7s linear infinite; vertical-align: middle; }
+  @keyframes s { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1 id="viewTitle">الرئيسية</h1>
+    <button class="icon-btn" id="refreshAll" title="تحديث">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+    </button>
+  </header>
+  <main id="view"></main>
+</div>
+
+<button class="fab" id="fab" aria-label="إضافة منتج">+</button>
+
+<nav>
+  <button data-tab="home" class="active"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></span>الرئيسية</button>
+  <button data-tab="deals"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span>العروض<span class="dot" id="dealsDot" hidden></span></button>
+  <button data-tab="account"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg></span>حسابي</button>
+</nav>
+
+<div class="backdrop" id="backdrop"></div>
+<div class="sheet" id="sheet"><div class="grab"></div><div id="sheetBody"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+tg?.ready(); tg?.expand();
+try { tg?.setHeaderColor("#0b0f1a"); tg?.setBackgroundColor("#0b0f1a"); } catch (e) {}
+
+const state = { items: [], tab: "home", checkMinutes: 60 };
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const num = (n) => n == null ? "—" : Number(n).toLocaleString("en-US", { maximumFractionDigits: 2 });
+const cur = (c) => ({ EGP: "ج.م", "جنيه": "ج.م", SAR: "ر.س", AED: "د.إ", "$": "$" }[c] ?? c ?? "");
+const money = (n, c) => n == null ? "غير متاح" : `${num(n)} ${cur(c)}`;
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { "Content-Type": "application/json", "X-Init-Data": tg?.initData || "", ...(opts.headers || {}) } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "حصلت مشكلة");
+  return data;
+}
+
+function toast(msg) {
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2200);
+}
+const haptic = (k = "light") => { try { tg?.HapticFeedback?.impactOccurred(k); } catch (e) {} };
+
+const isDeal = (it) => it.price != null && ((it.first != null && it.price < it.first) || (it.average != null && it.price < it.average));
+
+async function load() {
+  try {
+    const d = await api("/api/items");
+    state.items = d.items; state.checkMinutes = d.check_minutes;
+  } catch (e) {
+    $("#view").innerHTML = `<div class="empty"><div class="big">🔒</div>افتح التطبيق من جوه تيليجرام<br><small>${esc(e.message)}</small></div>`;
+    return;
+  }
+  render();
+}
+
+function itemRow(it) {
+  let pill = "";
+  if (it.target_on && it.target && it.price != null && it.price <= it.target) pill = `<span class="pill target">🎯 وصل للهدف</span>`;
+  else if (it.first != null && it.price != null && it.price < it.first) pill = `<span class="pill down">▼ ${num(((it.first - it.price) / it.first) * 100)}%</span>`;
+  else if (it.first != null && it.price != null && it.price > it.first) pill = `<span class="pill up">▲ ${num(((it.price - it.first) / it.first) * 100)}%</span>`;
+  return `<button class="item" data-id="${it.id}">
+    <div class="thumb">${it.image ? `<img src="${esc(it.image)}" alt="" loading="lazy">` : "📦"}</div>
+    <div class="info"><div class="title">${esc(it.title)}</div>
+    <div class="row"><span class="price">${money(it.price, it.currency)}</span>${pill}</div></div></button>`;
+}
+
+function render() {
+  const v = $("#view"), items = state.items, deals = items.filter(isDeal);
+  $("#dealsDot").hidden = !deals.length;
+  $("#fab").style.display = state.tab === "account" ? "none" : "grid";
+  document.querySelectorAll("nav button").forEach((b) => b.classList.toggle("active", b.dataset.tab === state.tab));
+
+  if (state.tab === "home") {
+    $("#viewTitle").textContent = "الرئيسية";
+    const c = items[0]?.currency;
+    const saved = items.reduce((s, it) => s + (it.first != null && it.price != null && it.price < it.first ? it.first - it.price : 0), 0);
+    const total = items.reduce((s, it) => s + (it.price || 0), 0);
+    v.innerHTML = `
+      <div class="stats">
+        <div class="stat"><small>عدد المنتجات</small><b>${items.length}</b></div>
+        <div class="stat good"><small>وفّرت لحد دلوقتي</small><b>${num(saved)}</b><span class="cur">${cur(c)}</span></div>
+        <div class="stat"><small>نازلين في السعر</small><b>${deals.length}</b></div>
+        <div class="stat"><small>إجمالي الأسعار</small><b>${num(total)}</b><span class="cur">${cur(c)}</span></div>
+      </div>
+      <div class="section-head"><span>منتجاتي</span><span>${items.length}</span></div>
+      ${items.length ? items.map(itemRow).join("") :
+        `<div class="empty"><div class="big">🦅</div>لسه مفيش منتجات<br>دوس على <b>+</b> وحط لينك من أمازون</div>`}`;
+  } else if (state.tab === "deals") {
+    $("#viewTitle").textContent = "العروض";
+    v.innerHTML = `<div class="section-head"><span>منتجات سعرها أقل من المعتاد</span><span>${deals.length}</span></div>
+      ${deals.length ? deals.map(itemRow).join("") : `<div class="empty"><div class="big">⚡</div>مفيش عروض دلوقتي<br>هبلغك أول ما سعر حاجة ينزل</div>`}`;
+  } else {
+    $("#viewTitle").textContent = "حسابي";
+    const u = tg?.initDataUnsafe?.user;
+    v.innerHTML = `
+      <div class="acc-card" style="text-align:center"><div class="avatar" style="margin-inline:auto">${esc((u?.first_name || "؟")[0])}</div>
+        <div class="v" style="font-size:18px">${esc([u?.first_name, u?.last_name].filter(Boolean).join(" ") || "مستخدم")}</div>
+        ${u?.username ? `<div class="k">@${esc(u.username)}</div>` : ""}</div>
+      <div class="acc-card"><div class="k">بيفحص الأسعار كل</div><div class="v">${state.checkMinutes} دقيقة</div></div>
+      <div class="acc-card"><div class="k">المنتجات المتتبعة</div><div class="v">${items.length}</div></div>
+      <div class="acc-card"><div class="k">إزاي بتشتغل؟</div><div class="v" style="font-weight:600;font-size:14px;line-height:1.8">
+        ضيف لينك أي منتج من أمازون، والبوت هيبعتلك رسالة لما السعر ينزل. ولو فعّلت السعر المستهدف، هيبلغك بس لما يوصل له أو أقل.</div></div>`;
+  }
+  v.querySelectorAll(".item").forEach((b) => b.onclick = () => openDetail(+b.dataset.id));
+}
+
+/* ---------- sheet ---------- */
+function openSheet(html) {
+  $("#sheetBody").innerHTML = html;
+  $("#backdrop").classList.add("open"); $("#sheet").classList.add("open");
+}
+function closeSheet() { $("#backdrop").classList.remove("open"); $("#sheet").classList.remove("open"); }
+$("#backdrop").onclick = closeSheet;
+
+function chart(it) {
+  const pts = it.history.filter((h) => h.p != null);
+  if (pts.length < 2) return `<div class="hint" style="text-align:center">الرسم البياني هيظهر بعد كام فحص</div>`;
+  const W = 320, H = 110, pad = 8, ps = pts.map((h) => h.p);
+  const min = Math.min(...ps), max = Math.max(...ps), span = max - min || 1;
+  const xy = pts.map((h, i) => [pad + (i * (W - 2 * pad)) / (pts.length - 1), H - pad - ((h.p - min) / span) * (H - 2 * pad)]);
+  const line = xy.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ");
+  const last = xy[xy.length - 1];
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#f5a524" stop-opacity=".35"/><stop offset="1" stop-color="#f5a524" stop-opacity="0"/></linearGradient></defs>
+    <path d="${line} L${last[0]},${H} L${xy[0][0]},${H} Z" fill="url(#g)"/>
+    <path d="${line}" fill="none" stroke="#f5a524" stroke-width="2.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+    <circle cx="${last[0]}" cy="${last[1]}" r="4" fill="#f5a524"/></svg>`;
+}
+
+function fmtDate(s) {
+  if (!s) return "";
+  const d = new Date(s);
+  return d.toLocaleDateString("ar-EG", { day: "numeric", month: "long" }) + "، " + d.toLocaleTimeString("ar-EG", { hour: "numeric", minute: "2-digit" });
+}
+
+function openDetail(id) {
+  const it = state.items.find((x) => x.id === id);
+  if (!it) return;
+  haptic();
+  openSheet(`
+    <div class="d-head">
+      <div class="thumb">${it.image ? `<img src="${esc(it.image)}" alt="">` : "📦"}</div>
+      <div><h2>${esc(it.title)}</h2>
+        <a class="link-pill" href="${esc(it.url)}" target="_blank" rel="noopener" id="openAmz">شوفه على أمازون ↗</a></div>
+    </div>
+    <div class="lbl"><span>السعر</span><span>${fmtDate(it.checked_at)}</span></div>
+    <div class="box now-price">
+      ${it.seller ? `<div class="seller">${esc(it.seller.toUpperCase())}</div>` : ""}
+      <div class="p">${money(it.price, it.currency)}</div>
+      <div class="minis">
+        <div class="mini"><small>أقل سعر</small><b>${num(it.lowest)}</b></div>
+        <div class="mini"><small>المتوسط</small><b>${num(it.average)}</b></div>
+        <div class="mini"><small>أعلى سعر</small><b>${num(it.highest)}</b></div>
+      </div>
+    </div>
+    <div class="lbl"><span>تاريخ السعر</span><span>${it.history.length} فحص</span></div>
+    <div class="box">${chart(it)}</div>
+    <div class="lbl"><span>تارجت السعر</span><span>المتوسط: ${money(it.average, it.currency)}</span></div>
+    <div class="box">
+      <div class="toggle-row"><span>تفعيل تارجت السعر</span><button class="switch ${it.target_on && it.target ? "on" : ""}" id="tSwitch" aria-label="تفعيل"></button></div>
+      <div class="target-input"><input id="tInput" inputmode="decimal" placeholder="السعر اللي عايزه (${cur(it.currency)})" value="${it.target ?? ""}">
+        <button class="btn" id="tSave">حفظ</button></div>
+      <div class="hint">${it.target_on && it.target ? `هبلغك لما يوصل ${money(it.target, it.currency)} أو أقل` : "من غير تارجت: هبلغك مع أي نزول في السعر"}</div>
+    </div>
+    <div class="actions">
+      <button class="btn ghost" id="dRefresh">افحص دلوقتي</button>
+      <button class="btn danger" id="dDelete">إلغاء المتابعة</button>
+    </div>`);
+
+  $("#openAmz").onclick = (e) => { if (tg?.openLink) { e.preventDefault(); tg.openLink(it.url); } };
+  $("#tSwitch").onclick = async () => {
+    const on = !(it.target_on && it.target);
+    if (on && !it.target) { $("#tInput").focus(); toast("اكتب السعر الأول"); return; }
+    await update(it.id, { target_on: on });
+  };
+  $("#tSave").onclick = async () => {
+    const val = $("#tInput").value.trim();
+    await update(it.id, { target: val || null, target_on: !!val });
+    toast(val ? "تم حفظ التارجت 🎯" : "اتشال التارجت");
+  };
+  $("#dRefresh").onclick = async (e) => {
+    e.target.disabled = true; e.target.innerHTML = `<span class="spin"></span>`;
+    try { replace(await api(`/api/items/${it.id}/refresh`, { method: "POST" })); toast("اتحدّث ✓"); }
+    catch (err) { toast(err.message); }
+    openDetail(it.id);
+  };
+  $("#dDelete").onclick = async () => {
+    const ok = tg?.showConfirm ? await new Promise((r) => tg.showConfirm("متأكد إنك عايز تلغي متابعة المنتج ده؟", r)) : confirm("متأكد؟");
+    if (!ok) return;
+    try { await api(`/api/items/${it.id}`, { method: "DELETE" }); } catch (err) { return toast(err.message); }
+    state.items = state.items.filter((x) => x.id !== it.id);
+    closeSheet(); render(); toast("اتشال 🗑️");
+  };
+}
+
+function replace(item) {
+  const i = state.items.findIndex((x) => x.id === item.id);
+  if (i >= 0) state.items[i] = item; else state.items.unshift(item);
+  render();
+}
+async function update(id, body) {
+  try { replace(await api(`/api/items/${id}`, { method: "PATCH", body: JSON.stringify(body) })); haptic(); openDetail(id); }
+  catch (e) { toast(e.message); }
+}
+
+/* ---------- add ---------- */
+$("#fab").onclick = () => {
+  haptic("medium");
+  openSheet(`
+    <h2 style="margin:0 0 4px;font-size:20px">ضيف منتج</h2>
+    <div class="hint" style="margin:0 0 14px">انسخ لينك المنتج من أبلكيشن أو موقع أمازون وحطه هنا</div>
+    <input id="aUrl" placeholder="https://www.amazon.eg/..." dir="ltr" style="width:100%">
+    <input id="aTarget" inputmode="decimal" placeholder="السعر المستهدف (اختياري)" style="width:100%;margin-top:10px">
+    <div class="err" id="aErr"></div>
+    <button class="btn" id="aGo" style="width:100%;margin-top:6px">ابدأ المتابعة</button>`);
+  setTimeout(() => $("#aUrl").focus(), 250);
+  $("#aGo").onclick = async () => {
+    const b = $("#aGo"), url = $("#aUrl").value.trim();
+    if (!url) return ($("#aErr").textContent = "حط اللينك الأول");
+    b.disabled = true; b.innerHTML = `<span class="spin"></span> بجيب بيانات المنتج...`; $("#aErr").textContent = "";
+    try {
+      const it = await api("/api/items", { method: "POST", body: JSON.stringify({ url, target: $("#aTarget").value.trim() || null }) });
+      replace(it); closeSheet(); toast("اتضاف ✓"); try { tg?.HapticFeedback?.notificationOccurred("success"); } catch (e) {}
+    } catch (e) { $("#aErr").textContent = e.message; b.disabled = false; b.textContent = "ابدأ المتابعة"; }
+  };
+};
+
+document.querySelectorAll("nav button").forEach((b) => b.onclick = () => { state.tab = b.dataset.tab; haptic(); render(); window.scrollTo(0, 0); });
+$("#refreshAll").onclick = async () => { haptic(); await load(); toast("اتحدّث ✓"); };
+
+load();
+</script>
+</body>
+</html>
